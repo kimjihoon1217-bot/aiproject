@@ -7,4 +7,4 @@ if st.button('인사말 생성'):
   st.info(a+'야 만나서 반갑다')
   st.warning(b+'를 좋아해? 취향참..ㅉ')
   st.error('나대지말고 처신잘해라')
-  st.Night()
+  st.ballons()
