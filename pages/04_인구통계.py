@@ -1,149 +1,18 @@
-import os
-import re
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-import streamlit as st
-
-# 1. 페이지 제목 및 레이아웃 설정
-st.set_page_config(
-    page_title="서울시 행정구별 인구 통계 대시보드",
-    page_icon="👥",
-    layout="wide"
-)
-
-# 2. 상위 폴더 경로 탐색 로직 (population.csv 찾기)
-def get_csv_filepath():
-    possible_paths = [
-        os.path.join("..", "population.csv"),  # pages 폴더 기준 상위 폴더
-        "population.csv",                      # 현재 디렉토리
-        os.path.join(os.path.dirname(__file__), "..", "population.csv")
-    ]
-    for path in possible_paths:
-        if os.path.exists(path):
-            return path
-    return "population.csv"
-
-# 3. 데이터 로드 및 전처리
-@st.cache_data
-def load_data():
-    file_path = get_csv_filepath()
-    try:
-        df = pd.read_csv(file_path, encoding='cp949', thousands=',')
-    except UnicodeDecodeError:
-        df = pd.read_csv(file_path, encoding='euc-kr', thousands=',')
-    
-    # 행정구역명 정제 (예: "서울특별시 종로구 (1111000000)" -> "서울특별시 종로구")
-    df['지역명'] = df['행정구역'].apply(lambda x: re.sub(r'\s*\(\d+\)', '', str(x)).strip())
-    return df
-
-try:
-    df = load_data()
-except Exception as e:
-    st.error(f"population.csv 파일을 불러오는 중 오류가 발생했습니다: {e}")
-    st.stop()
-
+# ... existing code ...
 # 4. 사이드바 - 메인 메뉴 및 필터
 st.sidebar.header("🧭 대시보드 메뉴")
 menu = st.sidebar.radio(
     "분석 항목 선택",
-    ["📈 연도별 남녀 연령별 인구 비교", "🏆 연령대별 자치구 순위 막대그래프", "🌟 [추가] 자치구별 고령화율(노령화 지표) 분석"]
+    [
+        "📈 연도별 남녀 연령별 인구 비교", 
+        "🏆 연령대별 자치구 순위 막대그래프", 
+        "🌟 [추가] 자치구별 고령화율(노령화 지표) 분석",
+        "🎮 [미니게임] 나이 먹는 코인 캐처!"
+    ]
 )
 
 # 공통 연령대 목록
-age_categories = [
-    '0~9세', '10~19세', '20~29세', '30~39세', '40~49세',
-    '50~59세', '60~69세', '70~79세', '80~89세', '90~99세', '100세 이상'
-]
-
-# ==========================================
-# MENU 1: 연도별 남녀 연령별 인구 비교 (꺾은선 그래프)
-# ==========================================
-if menu == "📈 연도별 남녀 연령별 인구 비교":
-    st.title("📈 연도별 행정구 및 남녀 연령별 인구 비교")
-    st.write("선택한 연도와 행정구의 **남성(핑크색)** 및 **여성(초록색)** 연령별 인구 분포를 꺾은선 그래프로 비교합니다.")
-
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        region_list = df['지역명'].tolist()
-        selected_region = st.selectbox("행정구 선택", region_list, index=0)
-    with col2:
-        years = [str(y) for y in range(2020, 2026)]
-        selected_year = st.selectbox("기준 연도", years, index=len(years) - 1)
-
-    # 데이터 추출
-    selected_row = df[df['지역명'] == selected_region].iloc[0]
-    
-    male_values = [selected_row[f'{selected_year}년_남_거주자_{age}'] for age in age_categories]
-    female_values = [selected_row[f'{selected_year}년_여_거주자_{age}'] for age in age_categories]
-
-    # Plotly 꺾은선 그래프 작성 (남성: 핑크색, 여성: 초록색)
-    fig = go.Figure()
-
-    # 남성: 핫핑크색 (#FF1493)
-    fig.add_trace(go.Scatter(
-        x=age_categories, y=male_values,
-        mode='lines+markers', name='남성',
-        line=dict(color='#FF1493', width=3),
-        marker=dict(size=8, color='#FF1493')
-    ))
-
-    # 여성: 초록색 (#228B22 - Forest Green)
-    fig.add_trace(go.Scatter(
-        x=age_categories, y=female_values,
-        mode='lines+markers', name='여성',
-        line=dict(color='#228B22', width=3),
-        marker=dict(size=8, color='#228B22')
-    ))
-
-    fig.update_layout(
-        title=f"<b>{selected_region}</b> ({selected_year}년) 남녀 연령별 인구 분포",
-        xaxis_title="나이 (연령대)",
-        yaxis_title="인구수 (명)",
-        xaxis=dict(showgrid=True, gridcolor='LightGray'),
-        yaxis=dict(showgrid=True, gridcolor='LightGray', dtick=100000, tickformat=','),
-        height=550,
-        hovermode="x unified"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-# ==========================================
-# MENU 2: 연령대별 자치구 순위 막대그래프 (요청하신 기능!)
-# ==========================================
-elif menu == "🏆 연령대별 자치구 순위 막대그래프":
-    st.title("🏆 특정 연령대별 행정구 순위 막대 그래프")
-    st.write("원하는 **연도**와 **10살 단위 연령대**를 선택하면, 서울시 자치구 중 해당 연령 인구가 많은 순서대로 막대 그래프가 정렬되어 나타납니다.")
-
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        years = [str(y) for y in range(2020, 2026)]
-        selected_year = st.selectbox("기준 연도", years, index=len(years) - 1)
-    with col2:
-        selected_age = st.selectbox("연령대 선택 (10살 단위)", age_categories, index=2) # 기본 20~29세
-
-    # '서울특별시' 전체 행 제외하고 구별 데이터만 추출
-    gu_df = df[df['지역명'] != '서울특별시'].copy()
-    
-    # 선택된 연도 + 연령대의 총 거주자 컬럼명 조합
-    target_col = f'{selected_year}년_거주자_{selected_age}'
-    
-    # 데이터 오름차순 정렬 (가로형 막대그래프에서 위쪽이 1위로 나오도록 정렬)
-    gu_sorted = gu_df.sort_values(by=target_col, ascending=True)
-
-    fig = px.bar(
-        gu_sorted,
-        x=target_col,
-        y='지역명',
-        orientation='h',
-        title=f"<b>{selected_year}년</b> <b>{selected_age}</b> 인구수가 많은 자치구 순위",
-        labels={target_col: '인구수 (명)', '지역명': '행정구역'},
-        color=target_col,
-        color_continuous_scale='Purples'
-    )
-    
-    fig.update_layout(height=650, xaxis=dict(tickformat=','))
-    st.plotly_chart(fig, use_container_width=True)
+# ... existing code ...
 
 # ==========================================
 # MENU 3: [추가] 자치구별 고령화율(노령화 지표) 분석
@@ -183,3 +52,203 @@ elif menu == "🌟 [추가] 자치구별 고령화율(노령화 지표) 분석":
     fig.update_layout(height=650)
     
     st.plotly_chart(fig, use_container_width=True)
+
+# ==========================================
+# MENU 4: 🎮 [미니게임] 나이 먹는 코인 캐처!
+# ==========================================
+elif menu == "🎮 [미니게임] 나이 먹는 코인 캐처!":
+    st.title("🎮 [미니게임] 나이 먹는 코인 캐처 (Age-Up Coin Game)")
+    st.caption("떨어지는 코인을 먹고 100세까지 건강하게 나이를 먹어보세요!")
+
+    # HTML/JS 기반 미니게임 임베딩
+    game_html = """
+    <!DOCTYPE html>
+    <html lang="ko">
+    <head>
+        <meta charset="UTF-8">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Jua&display=swap');
+            body { font-family: 'Jua', sans-serif; user-select: none; background: #0f172a; color: white; }
+            #game-canvas { background: linear-gradient(to bottom, #1e293b, #334155); border-radius: 12px; }
+        </style>
+    </head>
+    <body class="p-2 flex flex-col items-center justify-center min-h-screen">
+        <div class="w-full max-w-lg bg-slate-800 p-4 rounded-2xl border-2 border-slate-700 shadow-2xl relative">
+            <div class="flex justify-between items-center mb-2 px-1">
+                <span id="ui-age" class="text-xl font-black text-amber-400">🎂 10세</span>
+                <span id="ui-score" class="text-lg text-emerald-400">⭐ 0점</span>
+                <span id="ui-life" class="text-lg text-rose-400">❤️❤️❤️</span>
+            </div>
+            
+            <div class="relative w-full aspect-[4/5] max-h-[460px]">
+                <canvas id="game-canvas" class="w-full h-full block"></canvas>
+                <div id="overlay" class="absolute inset-0 bg-slate-950/90 rounded-xl flex flex-col items-center justify-center p-6 text-center">
+                    <div id="overlay-icon" class="text-6xl mb-2">👦</div>
+                    <h2 id="overlay-title" class="text-2xl font-bold text-amber-300 mb-2">나이 먹는 코인 받기!</h2>
+                    <p class="text-xs text-slate-300 mb-4">
+                        💰 <b>황금 코인</b>: +1세 / +100점<br>
+                        ⭐ <b>황금 별</b>: +5세 / +500점<br>
+                        🧪 <b>젊음의 묘약</b>: -3세 / 체력 회복<br>
+                        💣 <b>해골 폭탄</b>: -1개 목숨 / 손상
+                    </p>
+                    <button id="start-btn" class="w-full py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-black rounded-xl text-lg shadow-lg active:scale-95 transition">
+                        시작하기 🚀
+                    </button>
+                </div>
+            </div>
+
+            <!-- 모바일/화면 조작 버튼 -->
+            <div class="grid grid-cols-2 gap-2 mt-3 sm:hidden">
+                <button id="btn-left" class="py-3 bg-slate-700 active:bg-amber-600 rounded-xl text-xl font-bold">👈 왼쪽</button>
+                <button id="btn-right" class="py-3 bg-slate-700 active:bg-amber-600 rounded-xl text-xl font-bold">오른쪽 👉</button>
+            </div>
+        </div>
+
+        <script>
+            // Web Audio API 사운드 효과
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            function playSound(type) {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'coin') {
+                    osc.frequency.setValueAtTime(987.77, audioCtx.currentTime);
+                    osc.frequency.setValueAtTime(1318.51, audioCtx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.2);
+                } else if (type === 'potion') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.25);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+                    osc.start(); osc.stop(audioCtx.currentTime + 0.25);
+                }
+            }
+
+            const canvas = document.getElementById('game-canvas');
+            const ctx = canvas.getContext('2d');
+            function resize() { canvas.width = canvas.clientWidth; canvas.height = canvas.clientHeight; }
+            resize(); window.addEventListener('resize', resize);
+
+            let gameState = 'START';
+            let age = 10, score = 0, life = 3;
+            let items = [], spawnTimer = 0;
+            const keys = { left: false, right: false };
+
+            const player = { x: 0, y: 0, w: 40, h: 50, speed: 6 };
+
+            window.addEventListener('keydown', e => {
+                if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = true;
+                if (e.key === 'ArrowRight' || e.key === 'd') keys.right = true;
+            });
+            window.addEventListener('keyup', e => {
+                if (e.key === 'ArrowLeft' || e.key === 'a') keys.left = false;
+                if (e.key === 'ArrowRight' || e.key === 'd') keys.right = false;
+            });
+
+            document.getElementById('btn-left').onmousedown = document.getElementById('btn-left').ontouchstart = () => keys.left = true;
+            document.getElementById('btn-left').onmouseup = document.getElementById('btn-left').ontouchend = () => keys.left = false;
+            document.getElementById('btn-right').onmousedown = document.getElementById('btn-right').ontouchstart = () => keys.right = true;
+            document.getElementById('btn-right').onmouseup = document.getElementById('btn-right').ontouchend = () => keys.right = false;
+
+            function getEmoji() {
+                if (age < 20) return '👦';
+                if (age < 40) return '👨';
+                if (age < 60) return '👨‍💼';
+                if (age < 80) return '👴';
+                return '🧙‍♂️';
+            }
+
+            function startGame() {
+                age = 10; score = 0; life = 3; items = [];
+                player.x = canvas.width / 2 - 20;
+                player.y = canvas.height - 60;
+                document.getElementById('overlay').classList.add('hidden');
+                gameState = 'PLAYING';
+                updateUI();
+            }
+
+            function updateUI() {
+                document.getElementById('ui-age').innerText = `🎂 ${age}세`;
+                document.getElementById('ui-score').innerText = `⭐ ${score}점`;
+                document.getElementById('ui-life').innerText = '❤️'.repeat(life) + '🖤'.repeat(3 - life);
+            }
+
+            function gameOver() {
+                gameState = 'GAMEOVER';
+                document.getElementById('overlay-icon').innerText = age >= 100 ? '👑👴' : '🪦';
+                document.getElementById('overlay-title').innerText = age >= 100 ? '100세 만수무강 달성!' : '게임 오버!';
+                document.getElementById('start-btn').innerText = '다시 하기 🔄';
+                document.getElementById('overlay').classList.remove('hidden');
+            }
+
+            document.getElementById('start-btn').onclick = startGame;
+
+            function loop() {
+                if (gameState === 'PLAYING') {
+                    if (keys.left) player.x = Math.max(0, player.x - player.speed);
+                    if (keys.right) player.x = Math.min(canvas.width - player.w, player.x + player.speed);
+
+                    spawnTimer++;
+                    if (spawnTimer > 40) {
+                        spawnTimer = 0;
+                        const r = Math.random();
+                        let type = 'COIN', emoji = '💰';
+                        if (r < 0.6) { type = 'COIN'; emoji = '💰'; }
+                        else if (r < 0.75) { type = 'STAR'; emoji = '⭐'; }
+                        else if (r < 0.88) { type = 'POTION'; emoji = '🧪'; }
+                        else { type = 'BOMB'; emoji = '💣'; }
+                        items.push({ x: Math.random() * (canvas.width - 30), y: -30, type, emoji, speed: Math.random() * 2 + 3 });
+                    }
+
+                    for (let i = items.length - 1; i >= 0; i--) {
+                        const item = items[i];
+                        item.y += item.speed;
+
+                        // Collision
+                        if (item.x < player.x + player.w && item.x + 30 > player.x &&
+                            item.y < player.y + player.h && item.y + 30 > player.y) {
+                            
+                            if (item.type === 'COIN') { age += 1; score += 100; playSound('coin'); }
+                            else if (item.type === 'STAR') { age += 5; score += 500; playSound('coin'); }
+                            else if (item.type === 'POTION') { age = Math.max(10, age - 3); if (life < 3) life++; playSound('potion'); }
+                            else if (item.type === 'BOMB') { life -= 1; playSound('hit'); }
+
+                            updateUI();
+                            items.splice(i, 1);
+
+                            if (life <= 0 || age >= 100) gameOver();
+                            continue;
+                        }
+                        if (item.y > canvas.height) items.splice(i, 1);
+                    }
+                }
+
+                // Render
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.font = '24px serif';
+                items.forEach(it => ctx.fillText(it.emoji, it.x, it.y + 24));
+
+                ctx.font = '36px serif';
+                ctx.fillText(getEmoji(), player.x, player.y + 36);
+
+                requestAnimationFrame(loop);
+            }
+            loop();
+        </script>
+    </body>
+    </html>
+    """
+    st.components.v1.html(game_html, height=620, scrolling=False)
