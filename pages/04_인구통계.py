@@ -77,7 +77,7 @@ if menu == "📈 연도별 남녀 연령별 인구 비교":
     male_values = [selected_row[f'{selected_year}년_남_거주자_{age}'] for age in age_categories]
     female_values = [selected_row[f'{selected_year}년_여_거주자_{age}'] for age in age_categories]
 
-    # Plotly 꺾은선 그래프 작성
+    # Plotly 꺾은선 그래프 작성 (남성: 핑크색, 여성: 초록색)
     fig = go.Figure()
 
     # 남성: 핫핑크색 (#FF1493)
@@ -109,11 +109,11 @@ if menu == "📈 연도별 남녀 연령별 인구 비교":
     st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# MENU 2: 연령대별 자치구 순위 막대그래프
+# MENU 2: 연령대별 자치구 순위 막대그래프 (요청하신 기능!)
 # ==========================================
 elif menu == "🏆 연령대별 자치구 순위 막대그래프":
-    st.title("🏆 특정 연령대가 가장 많은 자치구 찾기")
-    st.write("원하는 **연도**와 **연령대**를 선택하면, 서울시 자치구 중 해당 연령 인구가 가장 많은 순서대로 막대 그래프가 그려집니다.")
+    st.title("🏆 특정 연령대별 행정구 순위 막대 그래프")
+    st.write("원하는 **연도**와 **10살 단위 연령대**를 선택하면, 서울시 자치구 중 해당 연령 인구가 많은 순서대로 막대 그래프가 정렬되어 나타납니다.")
 
     col1, col2 = st.sidebar.columns(2)
     with col1:
@@ -128,7 +128,7 @@ elif menu == "🏆 연령대별 자치구 순위 막대그래프":
     # 선택된 연도 + 연령대의 총 거주자 컬럼명 조합
     target_col = f'{selected_year}년_거주자_{selected_age}'
     
-    # 데이터 정렬 (오름차순 정렬 후 바차트 가로형 표현)
+    # 데이터 오름차순 정렬 (가로형 막대그래프에서 위쪽이 1위로 나오도록 정렬)
     gu_sorted = gu_df.sort_values(by=target_col, ascending=True)
 
     fig = px.bar(
@@ -146,7 +146,7 @@ elif menu == "🏆 연령대별 자치구 순위 막대그래프":
     st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================
-# MENU 3: [추가] 자치구별 고령화율(노령화 지표) 분석 (AI 추천 기능)
+# MENU 3: [추가] 자치구별 고령화율(노령화 지표) 분석
 # ==========================================
 elif menu == "🌟 [추가] 자치구별 고령화율(노령화 지표) 분석":
     st.title("🌟 [AI 추천 추가 기능] 자치구별 고령 인구 비율 분석")
@@ -183,6 +183,3 @@ elif menu == "🌟 [추가] 자치구별 고령화율(노령화 지표) 분석":
     fig.update_layout(height=650)
     
     st.plotly_chart(fig, use_container_width=True)
-    
-    with st.expander("📌 데이터 인사이트 보기"):
-        st.info("선택하신 연도의 서울시 자치구별 고령화 비율 순위를 통해 어느 자치구에 고령 인구가 상대적으로 집중되어 있는지 직관적으로 파악할 수 있습니다.")
